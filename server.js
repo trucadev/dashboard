@@ -21,19 +21,21 @@ const pool = mysql.createPool({
   timezone:        '-03:00',
 });
 
-// ── QUERIES ──────────────────────────────────────────────────────────────
+// ── QUERIES (Ajustadas para coluna 'pessoa') ──────────────────────────────
 
+// Revendas ativas (status = 1) separadas por pessoa J/F
 const SQL_REVENDAS = `
   SELECT
     COUNT(*)                                            AS total_ativas,
-    SUM(CASE WHEN tipo = 'J' THEN 1 ELSE 0 END)        AS recorrentes,
-    SUM(CASE WHEN tipo = 'F' THEN 1 ELSE 0 END)        AS pagamento_unico,
+    SUM(CASE WHEN pessoa = 'J' THEN 1 ELSE 0 END)        AS recorrentes,
+    SUM(CASE WHEN pessoa = 'F' THEN 1 ELSE 0 END)        AS pagamento_unico,
     COUNT(*) * 99.90                                    AS mrr_bruto,
-    SUM(CASE WHEN tipo = 'J' THEN 99.90 ELSE 0 END)    AS mrr_recorrente
+    SUM(CASE WHEN pessoa = 'J' THEN 99.90 ELSE 0 END)    AS mrr_recorrente
   FROM revendas
   WHERE status = 1
 `;
 
+// Anúncios por status
 const SQL_ANUNCIOS = `
   SELECT
     SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS ativos,
@@ -43,13 +45,14 @@ const SQL_ANUNCIOS = `
   FROM anuncios
 `;
 
+// Evolução mensal de revendas ativas
 const SQL_REVENDAS_MES = `
   SELECT
     DATE_FORMAT(created_at, '%b/%y')  AS mes,
     DATE_FORMAT(created_at, '%Y-%m')  AS mes_ordem,
     COUNT(*)                          AS novas,
-    SUM(CASE WHEN tipo = 'J' THEN 1 ELSE 0 END) AS novas_j,
-    SUM(CASE WHEN tipo = 'F' THEN 1 ELSE 0 END) AS novas_f
+    SUM(CASE WHEN pessoa = 'J' THEN 1 ELSE 0 END) AS novas_j,
+    SUM(CASE WHEN pessoa = 'F' THEN 1 ELSE 0 END) AS novas_f
   FROM revendas
   WHERE created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
   GROUP BY DATE_FORMAT(created_at, '%Y-%m'), DATE_FORMAT(created_at, '%b/%y')
@@ -57,6 +60,7 @@ const SQL_REVENDAS_MES = `
   LIMIT 12
 `;
 
+// Evolução mensal de anúncios publicados
 const SQL_ANUNCIOS_MES = `
   SELECT
     DATE_FORMAT(created_at, '%b/%y') AS mes,
@@ -70,6 +74,7 @@ const SQL_ANUNCIOS_MES = `
   LIMIT 12
 `;
 
+// Cancelamentos mensais (churn)
 const SQL_CHURN_MES = `
   SELECT
     DATE_FORMAT(updated_at, '%b/%y') AS mes,
