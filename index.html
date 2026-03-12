@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Trucadão · Dashboard 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --navy:"1A2744";--navy:#1A2744;--navy2:#243557;--blue:#2E5BBA;--blue-l:#EBF1FF;
+    --orange:#F5A623;--orange-l:#FFF3E0;--green:#27AE60;--green-l:#E8F8F0;
+    --red:#E74C3C;--red-l:#FDECEA;--gray:#F0F3F9;--gray2:#D5D8DC;
+    --text:#1A2744;--sub:#6B7280;--white:#fff;
+    --shadow:0 4px 24px rgba(26,39,68,.12);--radius:14px;--radius-sm:8px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#EEF2F8;color:var(--text);min-height:100vh}
+
+  .sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--navy);display:flex;flex-direction:column;z-index:100;box-shadow:4px 0 24px rgba(0,0,0,.18)}
+  .logo-box{padding:26px 20px 18px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .logo-title{color:#fff;font-size:22px;font-weight:800}
+  .logo-sub{color:var(--orange);font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+  .live-dot{display:inline-block;width:8px;height:8px;background:#27AE60;border-radius:50%;margin-right:5px;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .live-badge{font-size:11px;color:#27AE60;margin-top:8px;display:flex;align-items:center}
+  .meta-chip{display:inline-block;background:rgba(245,166,35,.15);color:var(--orange);border:1px solid rgba(245,166,35,.3);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;margin-top:6px}
+  .nav{flex:1;padding:12px 0}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;color:rgba(255,255,255,.6);font-size:13.5px;font-weight:500;transition:.2s;border-left:3px solid transparent}
+  .nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+  .nav-item.active{background:rgba(46,91,186,.35);color:#fff;border-left-color:var(--orange)}
+  .nav-icon{font-size:18px;width:22px;text-align:center}
+  .nav-footer{padding:16px 20px;border-top:1px solid rgba(255,255,255,.08)}
+  .nav-badge{font-size:11px;color:rgba(255,255,255,.4)}
+  .last-update{font-size:10px;color:rgba(255,255,255,.35);margin-top:4px}
+
+  .main{margin-left:220px;padding:28px 32px;min-height:100vh}
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+  .page-title{font-size:22px;font-weight:700;color:var(--navy)}
+  .page-sub{font-size:13px;color:var(--sub);margin-top:2px}
+  .btn-refresh{background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;transition:.2s;display:flex;align-items:center;gap:6px}
+  .btn-refresh:hover{background:#2448a0;transform:translateY(-1px)}
+  .btn-save{background:var(--orange);color:#fff;border:none;border-radius:var(--radius-sm);padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;transition:.2s;display:flex;align-items:center;gap:6px}
+  .btn-save:hover{background:#e0941a}
+  .btn-row{display:flex;gap:10px}
+
+  .api-banner{background:var(--green-l);border:1px solid #a7f3d0;border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;font-size:12.5px;color:#166534;display:flex;align-items:center;gap:8px}
+  .api-error{background:var(--red-l);border:1px solid #fca5a5;border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;font-size:12.5px;color:#991b1b;display:flex;align-items:center;gap:8px}
+  .hidden{display:none!important}
+
+  .tab-content{display:none}
+  .tab-content.active{display:block}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:24px}
+  .kpi-card{background:var(--white);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow);display:flex;align-items:center;gap:16px;position:relative;overflow:hidden;transition:.3s}
+  .kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+  .kpi-card.blue::before{background:var(--blue)}.kpi-card.orange::before{background:var(--orange)}
+  .kpi-card.green::before{background:var(--green)}.kpi-card.red::before{background:var(--red)}
+  .kpi-card.navy::before{background:var(--navy)}
+  .kpi-icon{width:50px;height:50px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+  .kpi-card.blue .kpi-icon{background:var(--blue-l)}.kpi-card.orange .kpi-icon{background:var(--orange-l)}
+  .kpi-card.green .kpi-icon{background:var(--green-l)}.kpi-card.red .kpi-icon{background:var(--red-l)}
+  .kpi-card.navy .kpi-icon{background:var(--blue-l)}
+  .kpi-source{font-size:10px;background:var(--green-l);color:var(--green);border-radius:99px;padding:1px 7px;font-weight:700;margin-left:4px}
+  .kpi-source.manual{background:var(--blue-l);color:var(--blue)}
+  .kpi-label{font-size:11px;color:var(--sub);font-weight:600;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center}
+  .kpi-value{font-size:26px;font-weight:800;color:var(--navy);margin:3px 0;line-height:1}
+  .kpi-sub{font-size:11px;color:var(--sub)}
+  .kpi-sub.pos{color:var(--green)}.kpi-sub.neg{color:var(--red)}
+
+  .section-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .progress-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+  .progress-card{background:var(--white);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow)}
+  .progress-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .progress-name{font-size:13px;font-weight:600;color:var(--navy)}
+  .progress-pct{font-size:14px;font-weight:800}
+  .progress-nums{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-bottom:6px}
+  .progress-bar-bg{height:10px;background:var(--gray);border-radius:99px;overflow:hidden}
+  .progress-bar-fill{height:100%;border-radius:99px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+  .status-chip{display:inline-block;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:700;margin-top:8px}
+
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
+  .chart-card{background:var(--white);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow)}
+  .chart-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:16px}
+  .chart-wrap{position:relative;height:215px}
+
+  .data-card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:24px}
+  .data-card-header{padding:16px 22px;background:var(--navy);display:flex;justify-content:space-between;align-items:center}
+  .data-card-title{color:#fff;font-size:15px;font-weight:700}
+  .tbl-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  thead th{background:#243557;color:rgba(255,255,255,.85);padding:10px 12px;text-align:center;font-weight:600;white-space:nowrap;font-size:11px;border-bottom:2px solid rgba(255,255,255,.1)}
+  thead th:first-child{text-align:left}
+  tbody tr:nth-child(even){background:#FAFBFD}
+  tbody tr:hover{background:#EEF2FB}
+  tbody td{padding:8px 12px;text-align:center;border-bottom:1px solid #EDF0F4}
+  tbody td:first-child{text-align:left;font-weight:600;color:var(--navy);white-space:nowrap}
+  .cell-input{width:100%;background:var(--blue-l);border:1px solid #C8D8F8;border-radius:5px;padding:5px 8px;text-align:center;font-size:12px;color:var(--blue);font-weight:600;transition:.15s;outline:none}
+  .cell-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(46,91,186,.15);background:#fff}
+  .cell-formula{padding:5px 8px;background:var(--gray);border-radius:5px;font-weight:700;color:var(--navy);font-size:12px;white-space:nowrap}
+  .cell-formula.green{background:var(--green-l);color:#1a7a43}
+  .cell-formula.red{background:var(--red-l);color:#c0392b}
+  .cell-formula.orange{background:var(--orange-l);color:#b5780a}
+  .cell-formula.live{background:#dcfce7;color:#15803d;border:1px solid #86efac}
+  tfoot td{background:var(--navy);color:#fff;font-weight:700;padding:10px 12px;text-align:center;font-size:12px}
+  tfoot td:first-child{text-align:left}
+
+  .info-box{background:var(--blue-l);border:1px solid #bfdbfe;border-radius:var(--radius-sm);padding:14px 18px;font-size:13px;color:var(--navy);margin-bottom:20px;line-height:1.6}
+  .info-box strong{color:var(--blue)}
+
+  ::-webkit-scrollbar{width:6px;height:6px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--gray2);border-radius:99px}
+
+  @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-grid{grid-template-columns:1fr}.progress-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo-box">
+    <div class="logo-title">Trucadão</div>
+    <div class="logo-sub">Dashboard 2026</div>
+    <div class="live-badge"><span class="live-dot"></span>Dados ao vivo</div>
+    <div class="meta-chip">Meta: 2× Receita</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-item active" onclick="showTab('dashboard')"><span class="nav-icon">📊</span><span>Dashboard</span></div>
+    <div class="nav-item" onclick="showTab('financeiro')"><span class="nav-icon">💰</span><span>Financeiro</span></div>
+    <div class="nav-item" onclick="showTab('leads')"><span class="nav-icon">🎯</span><span>Leads</span></div>
+    <div class="nav-item" onclick="showTab('config')"><span class="nav-icon">⚙️</span><span>Configuração</span></div>
+  </nav>
+  <div class="nav-footer">
+    <div class="nav-badge">trucadao.com.br</div>
+    <div class="last-update" id="last-update">Aguardando...</div>
+  </div>
+</aside>
+
+<main class="main">
+
+  <!-- STATUS BANNER -->
+  <div id="banner-ok"  class="api-banner hidden">✅ Dados carregados do banco — revendas e anúncios atualizados em tempo real</div>
+  <div id="banner-err" class="api-error hidden">⚠️ Não foi possível conectar à API. Verifique se o servidor está rodando e as credenciais do banco estão corretas.</div>
+
+  <!-- ═══ DASHBOARD ═══ -->
+  <div id="tab-dashboard" class="tab-content active">
+    <div class="topbar">
+      <div><div class="page-title">Dashboard Estratégico</div><div class="page-sub">Revendas e anúncios ao vivo · Financeiro via planilha</div></div>
+      <div class="btn-row">
+        <button class="btn-refresh" onclick="loadLiveData()">🔄 Atualizar agora</button>
+        <button class="btn-save" onclick="saveData()">💾 Salvar</button>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card blue">
+        <div class="kpi-icon">🏢</div>
+        <div>
+          <div class="kpi-label">Revendas Ativas<span class="kpi-source" id="src-revendas">AO VIVO</span></div>
+          <div class="kpi-value" id="kpi-revendas">—</div>
+          <div class="kpi-sub" id="kpi-revendas-sub">Carregando...</div>
+        </div>
+      </div>
+      <div class="kpi-card navy">
+        <div class="kpi-icon">📋</div>
+        <div>
+          <div class="kpi-label">Anúncios Ativos<span class="kpi-source" id="src-anuncios">AO VIVO</span></div>
+          <div class="kpi-value" id="kpi-anuncios">—</div>
+          <div class="kpi-sub" id="kpi-anuncios-sub">Carregando...</div>
+        </div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-icon">💰</div>
+        <div>
+          <div class="kpi-label">MRR (Recorrentes J)<span class="kpi-source" id="src-mrr">AO VIVO</span></div>
+          <div class="kpi-value" id="kpi-mrr">—</div>
+          <div class="kpi-sub" id="kpi-mrr-sub">Carregando...</div>
+        </div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-icon">📉</div>
+        <div>
+          <div class="kpi-label">Churn Rate (ano)<span class="kpi-source manual">MANUAL</span></div>
+          <div class="kpi-value" id="kpi-churn">—</div>
+          <div class="kpi-sub">Meta: ≤ 5% ao mês</div>
+        </div>
+      </div>
+      <div class="kpi-card orange">
+        <div class="kpi-icon">💸</div>
+        <div>
+          <div class="kpi-label">Total Gastos 2026<span class="kpi-source manual">PLANILHA</span></div>
+          <div class="kpi-value" id="kpi-gastos">R$ —</div>
+          <div class="kpi-sub">Acumulado no ano</div>
+        </div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-icon">📈</div>
+        <div>
+          <div class="kpi-label">Lucro 2026<span class="kpi-source manual">CALCULADO</span></div>
+          <div class="kpi-value" id="kpi-lucro">R$ —</div>
+          <div class="kpi-sub" id="kpi-margem">Margem: —</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">🎯 Progresso rumo às metas 2026</div>
+    <div class="progress-grid">
+      <div class="progress-card">
+        <div class="progress-header"><div class="progress-name">Revendas Ativas</div><div class="progress-pct" id="pct-rev" style="color:var(--blue)">—</div></div>
+        <div class="progress-nums"><span id="cur-rev">Atual: —</span><span>Meta: 200</span></div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-rev" style="width:0%;background:var(--blue)"></div></div>
+        <span class="status-chip" id="chip-rev" style="background:var(--gray);color:var(--sub)">Carregando...</span>
+      </div>
+      <div class="progress-card">
+        <div class="progress-header"><div class="progress-name">Anúncios Ativos</div><div class="progress-pct" id="pct-anu" style="color:var(--navy)">—</div></div>
+        <div class="progress-nums"><span id="cur-anu">Atual: —</span><span>Meta: 15.000</span></div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-anu" style="width:0%;background:var(--navy)"></div></div>
+        <span class="status-chip" id="chip-anu" style="background:var(--gray);color:var(--sub)">Carregando...</span>
+      </div>
+      <div class="progress-card">
+        <div class="progress-header"><div class="progress-name">Receita Total 2026</div><div class="progress-pct" id="pct-rec" style="color:var(--green)">—</div></div>
+        <div class="progress-nums"><span id="cur-rec">Atual: R$ —</span><span id="meta-rec">Meta: definir</span></div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-rec" style="width:0%;background:var(--green)"></div></div>
+        <span class="status-chip" id="chip-rec" style="background:var(--gray);color:var(--sub)">Aguardando dados</span>
+      </div>
+      <div class="progress-card">
+        <div class="progress-header"><div class="progress-name">MRR (Tipo J Recorrentes)</div><div class="progress-pct" id="pct-mrr2" style="color:var(--orange)">—</div></div>
+        <div class="progress-nums"><span id="cur-mrr2">MRR: R$ —</span><span id="meta-mrr2">Meta: definir</span></div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-mrr2" style="width:0%;background:var(--orange)"></div></div>
+        <span class="status-chip" id="chip-mrr2" style="background:var(--gray);color:var(--sub)">Carregando...</span>
+      </div>
+    </div>
+
+    <div class="section-title">📊 Gráficos ao vivo</div>
+    <div class="charts-grid">
+      <div class="chart-card"><div class="chart-title">Novas Revendas por Mês</div><div class="chart-wrap"><canvas id="chart-revendas-mes"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">Anúncios Publicados por Mês</div><div class="chart-wrap"><canvas id="chart-anuncios-mes"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">Receita vs Gastos (Financeiro)</div><div class="chart-wrap"><canvas id="chart-rv"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">MRR Estimado Mensal (R$)</div><div class="chart-wrap"><canvas id="chart-mrr-chart"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- ═══ FINANCEIRO ═══ -->
+  <div id="tab-financeiro" class="tab-content">
+    <div class="topbar">
+      <div><div class="page-title">💰 Controle Financeiro</div><div class="page-sub">Preencha os custos mensais — MRR vem automaticamente do banco</div></div>
+      <button class="btn-save" onclick="saveData()">💾 Salvar</button>
+    </div>
+    <div class="info-box">
+      <strong>Como funciona:</strong> A coluna MRR é puxada automaticamente do banco de dados. Preencha os custos mensais nos campos azuis. O lucro e a margem são calculados automaticamente.
+    </div>
+    <div class="data-card">
+      <div class="data-card-header"><div class="data-card-title">Financeiro 2026</div></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>MÊS</th><th>MRR (R$) 🔴AO VIVO</th><th>RECEITA ADIC.</th><th>RECEITA TOTAL</th>
+            <th>INFRA</th><th>PESSOAL</th><th>MARKETING</th><th>FERRAMENTAS</th><th>OUTROS</th>
+            <th>TOTAL GASTOS</th><th>LUCRO</th><th>MARGEM</th>
+          </tr></thead>
+          <tbody id="tbody-fin"></tbody>
+          <tfoot id="tfoot-fin"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ LEADS ═══ -->
+  <div id="tab-leads" class="tab-content">
+    <div class="topbar">
+      <div><div class="page-title">🎯 Controle de Leads</div><div class="page-sub">Preencha os leads por canal mensalmente</div></div>
+      <button class="btn-save" onclick="saveData()">💾 Salvar</button>
+    </div>
+    <div class="data-card">
+      <div class="data-card-header"><div class="data-card-title">Leads por Canal · 2026</div></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>MÊS</th><th>ORGÂNICO</th><th>OUTBOUND</th><th>INDICAÇÃO</th>
+            <th>TOTAL</th><th>CONVERTIDOS</th><th>CONVERSÃO</th><th>TICKET (R$)</th><th>RECEITA</th>
+          </tr></thead>
+          <tbody id="tbody-leads"></tbody>
+          <tfoot id="tfoot-leads"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CONFIG ═══ -->
+  <div id="tab-config" class="tab-content">
+    <div class="topbar">
+      <div><div class="page-title">⚙️ Configuração</div><div class="page-sub">Ajuste metas e integrações</div></div>
+    </div>
+    <div class="data-card" style="max-width:600px">
+      <div class="data-card-header"><div class="data-card-title">Metas 2026</div></div>
+      <div style="padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div><label style="font-size:13px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px">Meta de Revendas Ativas</label>
+          <input class="cell-input" id="cfg-meta-revendas" type="number" value="200" style="max-width:200px;display:block"/></div>
+        <div><label style="font-size:13px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px">Meta de Anúncios Ativos</label>
+          <input class="cell-input" id="cfg-meta-anuncios" type="number" value="15000" style="max-width:200px;display:block"/></div>
+        <div><label style="font-size:13px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px">Meta de Receita Total 2026 (R$)</label>
+          <input class="cell-input" id="cfg-meta-receita" type="number" placeholder="Ex: 500000" style="max-width:200px;display:block"/></div>
+        <div><label style="font-size:13px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px">Meta MRR Mensal (R$)</label>
+          <input class="cell-input" id="cfg-meta-mrr" type="number" placeholder="Ex: 20000" style="max-width:200px;display:block"/></div>
+        <button class="btn-save" onclick="saveConfig()" style="align-self:flex-start">💾 Salvar metas</button>
+      </div>
+    </div>
+    <div class="data-card" style="max-width:600px">
+      <div class="data-card-header"><div class="data-card-title">Status da API</div></div>
+      <div style="padding:24px">
+        <div id="api-status-info" style="font-size:13px;color:var(--sub)">Verificando...</div>
+        <button class="btn-refresh" style="margin-top:12px" onclick="checkApiHealth()">🔄 Testar conexão</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const MONTHS = ["Jan/26","Fev/26","Mar/26","Abr/26","Mai/26","Jun/26","Jul/26","Ago/26","Set/26","Out/26","Nov/26","Dez/26"];
+const N = 12;
+
+// ── CONFIG ───────────────────────────────────────────────────────────────
+let CFG = JSON.parse(localStorage.getItem('trucadao_cfg') || 'null') || {
+  metaRevendas: 200,
+  metaAnuncios: 15000,
+  metaReceita: 0,
+  metaMrr: 0,
+};
+
+// ── MANUAL DATA ──────────────────────────────────────────────────────────
+let D = JSON.parse(localStorage.getItem('trucadao_2026') || 'null') || {
+  fin: {
+    recAdic:  Array(N).fill(0),
+    infra:    Array(N).fill(0),
+    pessoal:  Array(N).fill(0),
+    mktg:     Array(N).fill(0),
+    ferr:     Array(N).fill(0),
+    outros:   Array(N).fill(0),
+  },
+  leads: {
+    organico:  Array(N).fill(0),
+    outbound:  Array(N).fill(0),
+    indicacao: Array(N).fill(0),
+    conv:      Array(N).fill(0),
+    ticket:    Array(N).fill(0),
+  },
+  liveRevendas: Array(N).fill(0),
+};
+
+// ── LIVE DATA (from API) ─────────────────────────────────────────────────
+let LIVE = { revendas:{}, anuncios:{}, historico:{} };
+
+// ── FORMAT ───────────────────────────────────────────────────────────────
+const fBRL = n => n ? 'R$ ' + Math.round(n).toLocaleString('pt-BR') : 'R$ -';
+const fNum = n => n ? Math.round(n).toLocaleString('pt-BR') : '-';
+const fPct = n => n ? (n*100).toFixed(1)+'%' : '-';
+const fDec = n => n ? n.toFixed(1) : '-';
+
+// ── LOAD LIVE DATA ────────────────────────────────────────────────────────
+async function loadLiveData() {
+  try {
+    const res = await fetch('/api/stats');
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    LIVE = await res.json();
+    document.getElementById('banner-ok').classList.remove('hidden');
+    document.getElementById('banner-err').classList.add('hidden');
+    document.getElementById('last-update').textContent =
+      'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
+    updateKPIs();
+    renderTables();
+    initCharts();
+  } catch(e) {
+    document.getElementById('banner-err').classList.remove('hidden');
+    document.getElementById('banner-ok').classList.add('hidden');
+    console.error('[API]', e.message);
+    // fallback: render with manual data only
+    renderTables();
+    initCharts();
+  }
+}
+
+// ── HEALTH CHECK ─────────────────────────────────────────────────────────
+async function checkApiHealth() {
+  const el = document.getElementById('api-status-info');
+  el.textContent = 'Verificando...';
+  try {
+    const res = await fetch('/api/health');
+    const j = await res.json();
+    el.innerHTML = `<span style="color:var(--green);font-weight:700">✅ API conectada</span><br>
+      Servidor OK · ${new Date(j.time).toLocaleString('pt-BR')}`;
+  } catch(e) {
+    el.innerHTML = `<span style="color:var(--red);font-weight:700">❌ API offline</span><br>
+      Verifique se o servidor Node.js está rodando no EasyPanel.`;
+  }
+}
+
+// ── UPDATE KPIs ───────────────────────────────────────────────────────────
+function updateKPIs() {
+  const rv = LIVE.revendas || {};
+  const an = LIVE.anuncios || {};
+
+  document.getElementById('kpi-revendas').textContent = fNum(rv.total_ativas);
+  document.getElementById('kpi-revendas-sub').textContent =
+    `Recorrentes J: ${fNum(rv.recorrentes)} · Único F: ${fNum(rv.pagamento_unico)}`;
+
+  document.getElementById('kpi-anuncios').textContent = fNum(an.ativos);
+  document.getElementById('kpi-anuncios-sub').textContent =
+    `Vendidos: ${fNum(an.vendidos)} · Total cadastros: ${fNum(an.total)}`;
+
+  document.getElementById('kpi-mrr').textContent = fBRL(rv.mrr_recorrente);
+  document.getElementById('kpi-mrr-sub').textContent =
+    `${fNum(rv.recorrentes)} revendas × R$ 99,90`;
+
+  // Progress bars
+  setProgress('rev', rv.total_ativas, CFG.metaRevendas, var_('blue'));
+  setProgress('anu', an.ativos, CFG.metaAnuncios, '#1A2744');
+  if(CFG.metaMrr > 0) setProgress('mrr2', rv.mrr_recorrente, CFG.metaMrr, 'var(--orange)');
+
+  // Financeiro KPIs
+  const fn = calcFin();
+  const totRec = fn.reduce((a,b)=>a+b.recTotal,0);
+  const totGas = fn.reduce((a,b)=>a+b.gastos,0);
+  const totLuc = fn.reduce((a,b)=>a+b.lucro,0);
+  document.getElementById('kpi-gastos').textContent = fBRL(totGas);
+  document.getElementById('kpi-lucro').textContent  = fBRL(totLuc);
+  document.getElementById('kpi-margem').textContent = totRec>0 ? 'Margem: '+fPct(totLuc/totRec) : 'Margem: —';
+  if(CFG.metaReceita > 0) {
+    setProgress('rec', totRec, CFG.metaReceita, 'var(--green)');
+    document.getElementById('cur-rec').textContent = 'Atual: '+fBRL(totRec);
+    document.getElementById('meta-rec').textContent = 'Meta: '+fBRL(CFG.metaReceita);
+  }
+  // Churn from manual fin data
+  const totCancel = D.liveRevendas.reduce((a,b)=>(a||0)+(b||0),0);
+}
+
+function var_(v){ return `var(--${v})`; }
+
+function setProgress(id, cur, meta, color) {
+  if(!meta || !cur) return;
+  const p = Math.min(Math.round((cur/meta)*100), 100);
+  document.getElementById(`pct-${id}`).textContent = p+'%';
+  const bar = document.getElementById(`bar-${id}`);
+  if(bar){ bar.style.width = Math.max(p,2)+'%'; bar.style.background = color; }
+  const curEl = document.getElementById(`cur-${id}`);
+  if(curEl) curEl.textContent = 'Atual: '+fNum(cur);
+  const metaEl = document.getElementById(`meta-${id}`);
+  if(metaEl) metaEl.textContent = 'Meta: '+fNum(meta);
+  const chip = document.getElementById(`chip-${id}`);
+  if(chip){
+    if(p>=90){ chip.textContent='✅ No caminho certo'; chip.style.background='var(--green-l)'; chip.style.color='var(--green)'; }
+    else if(p>=50){ chip.textContent='⚡ Atenção · Acelerar'; chip.style.background='var(--orange-l)'; chip.style.color='var(--orange)'; }
+    else { chip.textContent='🚨 Crítico · Revisar plano'; chip.style.background='var(--red-l)'; chip.style.color='var(--red)'; }
+  }
+}
+
+// ── CALC FINANCEIRO ───────────────────────────────────────────────────────
+function getMrrForMonth(i) {
+  // Use live MRR if available, otherwise use history
+  const hist = LIVE.historico?.revendas_mes || [];
+  if(hist.length > 0 && hist[i]) {
+    return (hist[i].novas_j || 0) * 99.90;
+  }
+  // fallback: current MRR / 12
+  const mrr = LIVE.revendas?.mrr_recorrente || 0;
+  return mrr; // just show current MRR for all months until we have history
+}
+
+function calcFin() {
+  return MONTHS.map((_, i) => {
+    const mrr     = getMrrForMonth(i);
+    const recAdic = D.fin.recAdic[i]||0;
+    const recTotal= mrr + recAdic;
+    const infra   = D.fin.infra[i]||0;
+    const pessoal = D.fin.pessoal[i]||0;
+    const mktg    = D.fin.mktg[i]||0;
+    const ferr    = D.fin.ferr[i]||0;
+    const outros  = D.fin.outros[i]||0;
+    const gastos  = infra+pessoal+mktg+ferr+outros;
+    const lucro   = recTotal - gastos;
+    const margem  = recTotal > 0 ? lucro/recTotal : 0;
+    return {mrr,recAdic,recTotal,infra,pessoal,mktg,ferr,outros,gastos,lucro,margem};
+  });
+}
+
+// ── RENDER FINANCEIRO TABLE ───────────────────────────────────────────────
+function renderFin() {
+  const fn = calcFin();
+  const tbody = document.getElementById('tbody-fin');
+  tbody.innerHTML = '';
+  fn.forEach((r,i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${MONTHS[i]}</td>
+      <td><div class="cell-formula live">${fBRL(r.mrr)}</div></td>
+      <td><input class="cell-input" type="number" min="0" value="${D.fin.recAdic[i]||''}"
+          onchange="D.fin.recAdic[${i}]=parseFloat(this.value)||0;renderFin();updateKPIs();initCharts()"/></td>
+      <td><div class="cell-formula green">${fBRL(r.recTotal)}</div></td>
+      <td><input class="cell-input" type="number" min="0" value="${D.fin.infra[i]||''}"
+          onchange="D.fin.infra[${i}]=parseFloat(this.value)||0;renderFin();updateKPIs();initCharts()"/></td>
+      <td><input class="cell-input" type="number" min="0" value="${D.fin.pessoal[i]||''}"
+          onchange="D.fin.pessoal[${i}]=parseFloat(this.value)||0;renderFin();updateKPIs();initCharts()"/></td>
+      <td><input class="cell-input" type="number" min="0" value="${D.fin.mktg[i]||''}"
+          onchange="D.fin.mktg[${i}]=parseFloat(this.value)||0;renderFin();updateKPIs();initCharts()"/></td>
+      <td><input class="cell-input" type="number" min="0" value="${D.fin.ferr[i]||''}"
+          onchange="D.fin.ferr[${i}]=parseFloat(this.value)||0;renderFin();updateKPIs();initCharts()"/></td>
+      <td><input class="cell-input" type="number" min="0" value="${D.fin.outros[i]||''}"
+          onchange="D.fin.outros[${i}]=parseFloat(this.value)||0;renderFin();updateKPIs();initCharts()"/></td>
+      <td><div class="cell-formula red">${fBRL(r.gastos)}</div></td>
+      <td><div class="cell-formula ${r.lucro>=0?'green':'red'}">${fBRL(r.lucro)}</div></td>
+      <td><div class="cell-formula ${r.margem>=0.3?'green':r.margem>=0.1?'orange':'red'}">${fPct(r.margem)}</div></td>`;
+    tbody.appendChild(tr);
+  });
+  const t = fn.reduce((a,b)=>({mrr:a.mrr+b.mrr,recAdic:a.recAdic+b.recAdic,recTotal:a.recTotal+b.recTotal,
+    infra:a.infra+b.infra,pessoal:a.pessoal+b.pessoal,mktg:a.mktg+b.mktg,ferr:a.ferr+b.ferr,
+    outros:a.outros+b.outros,gastos:a.gastos+b.gastos,lucro:a.lucro+b.lucro}),
+    {mrr:0,recAdic:0,recTotal:0,infra:0,pessoal:0,mktg:0,ferr:0,outros:0,gastos:0,lucro:0});
+  document.getElementById('tfoot-fin').innerHTML = `<tr>
+    <td>TOTAL 2026</td>
+    <td>${fBRL(t.mrr)}</td><td>${fBRL(t.recAdic)}</td><td>${fBRL(t.recTotal)}</td>
+    <td>${fBRL(t.infra)}</td><td>${fBRL(t.pessoal)}</td><td>${fBRL(t.mktg)}</td>
+    <td>${fBRL(t.ferr)}</td><td>${fBRL(t.outros)}</td>
+    <td>${fBRL(t.gastos)}</td><td>${fBRL(t.lucro)}</td>
+    <td>${t.recTotal>0?(t.lucro/t.recTotal*100).toFixed(1)+'%':'—'}</td>
+  </tr>`;
+}
+
+// ── RENDER LEADS TABLE ────────────────────────────────────────────────────
+function renderLeads() {
+  const tbody = document.getElementById('tbody-leads');
+  tbody.innerHTML = '';
+  let tots = {org:0,out:0,ind:0,tot:0,conv:0,rec:0};
+  MONTHS.forEach((mo,i) => {
+    const org=D.leads.organico[i]||0, out=D.leads.outbound[i]||0, ind=D.leads.indicacao[i]||0;
+    const tot=org+out+ind, conv=D.leads.conv[i]||0, ticket=D.leads.ticket[i]||0;
+    const taxa=tot>0?conv/tot:0, rec=conv*ticket;
+    tots.org+=org; tots.out+=out; tots.ind+=ind; tots.tot+=tot; tots.conv+=conv; tots.rec+=rec;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${mo}</td>
+      <td><input class="cell-input" type="number" min="0" value="${D.leads.organico[i]||''}" onchange="D.leads.organico[${i}]=parseFloat(this.value)||0;renderLeads()"/></td>
+      <td><input class="cell-input" type="number" min="0" value="${D.leads.outbound[i]||''}" onchange="D.leads.outbound[${i}]=parseFloat(this.value)||0;renderLeads()"/></td>
+      <td><input class="cell-input" type="number" min="0" value="${D.leads.indicacao[i]||''}" onchange="D.leads.indicacao[${i}]=parseFloat(this.value)||0;renderLeads()"/></td>
+      <td><div class="cell-formula green">${fNum(tot)}</div></td>
+      <td><input class="cell-input" type="number" min="0" value="${D.leads.conv[i]||''}" onchange="D.leads.conv[${i}]=parseFloat(this.value)||0;renderLeads()"/></td>
+      <td><div class="cell-formula ${taxa>0.1?'green':taxa>0.05?'orange':'red'}">${fPct(taxa)}</div></td>
+      <td><input class="cell-input" type="number" min="0" value="${D.leads.ticket[i]||''}" onchange="D.leads.ticket[${i}]=parseFloat(this.value)||0;renderLeads()"/></td>
+      <td><div class="cell-formula green">${fBRL(rec)}</div></td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('tfoot-leads').innerHTML=`<tr>
+    <td>TOTAL</td><td>${fNum(tots.org)}</td><td>${fNum(tots.out)}</td><td>${fNum(tots.ind)}</td>
+    <td>${fNum(tots.tot)}</td><td>${fNum(tots.conv)}</td>
+    <td>${tots.tot>0?(tots.conv/tots.tot*100).toFixed(1)+'%':'—'}</td>
+    <td>—</td><td>${fBRL(tots.rec)}</td></tr>`;
+}
+
+function renderTables(){ renderFin(); renderLeads(); }
+
+// ── CHARTS ────────────────────────────────────────────────────────────────
+let charts = {};
+const baseOpts = {
+  responsive:true, maintainAspectRatio:false,
+  plugins:{ legend:{ labels:{ color:'#1A2744', font:{ family:'Segoe UI', size:11 } } } },
+  scales:{ x:{ grid:{ color:'#EDF0F4' }, ticks:{ color:'#6B7280', font:{size:10} } },
+           y:{ grid:{ color:'#EDF0F4' }, ticks:{ color:'#6B7280', font:{size:10} } } }
+};
+
+function initCharts() {
+  const hist = LIVE.historico || {};
+  const revMes  = hist.revendas_mes  || [];
+  const anuMes  = hist.anuncios_mes  || [];
+  const fn      = calcFin();
+
+  const labels  = revMes.length ? revMes.map(r=>r.mes) : MONTHS;
+  const labels2 = anuMes.length ? anuMes.map(r=>r.mes) : MONTHS;
+
+  // Chart 1: Novas revendas por mês
+  buildChart('chart-revendas-mes', 'bar', labels,
+    [{ label:'Novas Revendas', data: revMes.map(r=>r.novas||0), backgroundColor:'rgba(46,91,186,.8)', borderRadius:5 },
+     { label:'Recorrentes J',  data: revMes.map(r=>r.novas_j||0), backgroundColor:'rgba(39,174,96,.7)', borderRadius:5 }]
+  );
+
+  // Chart 2: Anúncios publicados por mês
+  buildChart('chart-anuncios-mes', 'bar', labels2,
+    [{ label:'Publicados',  data:anuMes.map(r=>r.publicados||0), backgroundColor:'rgba(26,39,68,.8)', borderRadius:5 },
+     { label:'Vendidos',    data:anuMes.map(r=>r.vendidos||0),   backgroundColor:'rgba(245,166,35,.8)', borderRadius:5 }]
+  );
+
+  // Chart 3: Receita vs Gastos
+  buildChart('chart-rv', 'bar', MONTHS,
+    [{ label:'Receita Total', data:fn.map(f=>f.recTotal), backgroundColor:'rgba(39,174,96,.8)', borderRadius:5 },
+     { label:'Total Gastos',  data:fn.map(f=>f.gastos),   backgroundColor:'rgba(231,76,60,.75)', borderRadius:5 }]
+  );
+
+  // Chart 4: MRR Mensal
+  buildChart('chart-mrr-chart', 'line', MONTHS,
+    [{ label:'MRR (R$)',       data:fn.map(f=>f.mrr),   borderColor:'#2E5BBA', backgroundColor:'rgba(46,91,186,.07)', fill:true, tension:.4, pointRadius:4 },
+     { label:'Lucro Bruto (R$)',data:fn.map(f=>f.lucro), borderColor:'#27AE60', backgroundColor:'rgba(39,174,96,.07)', fill:true, tension:.4, pointRadius:4 }]
+  );
+}
+
+function buildChart(id, type, labels, datasets) {
+  if(charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id);
+  if(!ctx) return;
+  charts[id] = new Chart(ctx.getContext('2d'), { type, data:{ labels, datasets }, options:{ ...baseOpts } });
+}
+
+// ── NAV ───────────────────────────────────────────────────────────────────
+function showTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.querySelector(`[onclick="showTab('${tab}')"]`).classList.add('active');
+  if(tab==='dashboard') initCharts();
+}
+
+// ── SAVE / CONFIG ─────────────────────────────────────────────────────────
+function saveData() {
+  localStorage.setItem('trucadao_2026', JSON.stringify(D));
+  const btns = document.querySelectorAll('.btn-save');
+  btns.forEach(b=>{ const o=b.innerHTML; b.innerHTML='✅ Salvo!'; b.style.background='var(--green)'; setTimeout(()=>{b.innerHTML=o;b.style.background='var(--orange)'},2000); });
+}
+
+function saveConfig() {
+  CFG.metaRevendas = parseFloat(document.getElementById('cfg-meta-revendas').value)||200;
+  CFG.metaAnuncios = parseFloat(document.getElementById('cfg-meta-anuncios').value)||15000;
+  CFG.metaReceita  = parseFloat(document.getElementById('cfg-meta-receita').value)||0;
+  CFG.metaMrr      = parseFloat(document.getElementById('cfg-meta-mrr').value)||0;
+  localStorage.setItem('trucadao_cfg', JSON.stringify(CFG));
+  updateKPIs();
+  alert('Metas salvas!');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+document.getElementById('cfg-meta-revendas').value = CFG.metaRevendas;
+document.getElementById('cfg-meta-anuncios').value = CFG.metaAnuncios;
+if(CFG.metaReceita) document.getElementById('cfg-meta-receita').value = CFG.metaReceita;
+if(CFG.metaMrr)     document.getElementById('cfg-meta-mrr').value     = CFG.metaMrr;
+
+renderTables();
+loadLiveData();
+checkApiHealth();
+
+// Auto-refresh a cada 5 minutos
+setInterval(loadLiveData, 5 * 60 * 1000);
+</script>
+</body>
+</html>
