@@ -11,11 +11,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Pool de conexão MySQL ────────────────────────────────────────────────
 const pool = mysql.createPool({
-  host:            process.env.DB_HOST,
+  host:            process.env.DB_HOST || '159.89.243.28',
   port:            process.env.DB_PORT || 3306,
-  user:            process.env.DB_USER,
-  password:        process.env.DB_PASS,
-  database:        process.env.DB_NAME,
+  user:            process.env.DB_USER || 'trucadao',
+  password:        process.env.DB_PASS || 'trucadao',
+  database:        process.env.DB_NAME || 'trucadao',
   waitForConnections: true,
   connectionLimit: 10,
   timezone:        '-03:00',
@@ -23,7 +23,6 @@ const pool = mysql.createPool({
 
 // ── QUERIES ──────────────────────────────────────────────────────────────
 
-// Revendas ativas (status = 1) separadas por tipo J/F
 const SQL_REVENDAS = `
   SELECT
     COUNT(*)                                            AS total_ativas,
@@ -35,7 +34,6 @@ const SQL_REVENDAS = `
   WHERE status = 1
 `;
 
-// Anúncios por status
 const SQL_ANUNCIOS = `
   SELECT
     SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS ativos,
@@ -45,8 +43,6 @@ const SQL_ANUNCIOS = `
   FROM anuncios
 `;
 
-// Evolução mensal de revendas ativas (últimos 12 meses)
-// AJUSTE: substitua "created_at" pelo nome real da coluna de data da tabela revendas
 const SQL_REVENDAS_MES = `
   SELECT
     DATE_FORMAT(created_at, '%b/%y')  AS mes,
@@ -61,8 +57,6 @@ const SQL_REVENDAS_MES = `
   LIMIT 12
 `;
 
-// Evolução mensal de anúncios publicados (últimos 12 meses)
-// AJUSTE: substitua "created_at" pelo nome real da coluna de data da tabela anuncios
 const SQL_ANUNCIOS_MES = `
   SELECT
     DATE_FORMAT(created_at, '%b/%y') AS mes,
@@ -76,9 +70,6 @@ const SQL_ANUNCIOS_MES = `
   LIMIT 12
 `;
 
-// Cancelamentos mensais (churn) — últimos 12 meses
-// AJUSTE: se você tiver uma coluna "cancelled_at" ou "updated_at", use aqui
-// Se não tiver rastreamento de data de cancelamento, remova este bloco
 const SQL_CHURN_MES = `
   SELECT
     DATE_FORMAT(updated_at, '%b/%y') AS mes,
@@ -107,8 +98,8 @@ app.get('/api/stats', async (req, res) => {
     res.json({
       timestamp: new Date().toISOString(),
       revendas: {
-        total_ativas:    Number(revendas.total_ativas)   || 0,
-        recorrentes:     Number(revendas.recorrentes)    || 0,
+        total_ativas:    Number(revendas.total_ativas)    || 0,
+        recorrentes:     Number(revendas.recorrentes)     || 0,
         pagamento_unico: Number(revendas.pagamento_unico)|| 0,
         mrr_recorrente:  Number(revendas.mrr_recorrente) || 0,
         mrr_bruto:       Number(revendas.mrr_bruto)      || 0,
@@ -144,6 +135,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// ── INICIALIZAÇÃO ────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[Trucadao API] rodando na porta ${PORT}`);
