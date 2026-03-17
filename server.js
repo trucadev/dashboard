@@ -20,13 +20,14 @@ const pool = mysql.createPool({
   timezone:        '-03:00',
 });
 
-function montarUrlImagem(id, hash) {
-  if (!id || !hash) return null;
+function montarUrlImagem(id, filename) {
+  if (!id || !filename) return null;
+  const name = filename.replace(/\.jpg$/, "");
   const padded = String(id).padStart(9, '0');
   const p1 = padded.slice(0, 3);
   const p2 = padded.slice(3, 6);
   const p3 = padded.slice(6, 9);
-  return 'https://d2o450bmsmjkde.cloudfront.net/system/imagens_anuncios/imagems/' + p1 + '/' + p2 + '/' + p3 + '/normal/' + hash + '.jpg';
+  return 'https://d2o450bmsmjkde.cloudfront.net/system/imagens_anuncios/imagems/' + p1 + '/' + p2 + '/' + p3 + '/normal/' + name + '.jpg';
 }
 
 const SQL_REVENDAS = `
@@ -135,7 +136,7 @@ app.get('/api/veiculos', async (req, res) => {
     SELECT a.id, a.ano_modelo, a.preco, a.km, a.cidade, a.observacao, a.status,
       ma.nome AS marca, ma.slug AS marca_slug, mo.nome AS modelo, mo.slug AS modelo_slug,
       t.nome AS tipo, t.slug AS tipo_slug, e.nome AS estado, e.sigla AS estado_sigla,
-      img.id AS img_id, img.hash AS img_hash,
+      img.id AS img_id, img.imagem_file_name AS img_filename,
       CONCAT('https://www.trucadao.com.br/', t.slug, '/', ma.slug, '/', LOWER(e.sigla), '/', mo.slug, '/', a.id) AS url
     FROM anuncios a
     LEFT JOIN marcas ma ON ma.id = a.marca_id
@@ -151,7 +152,7 @@ app.get('/api/veiculos', async (req, res) => {
     conn = await pool.getConnection();
     const [rows] = await conn.query(sql, params);
     const veiculos = rows.map(function(v) {
-      return Object.assign({}, v, { imagem: montarUrlImagem(v.img_id, v.img_hash) });
+      return Object.assign({}, v, { imagem: montarUrlImagem(v.img_id, v.img_filename) });
     });
     res.json({ total: veiculos.length, veiculos });
   } catch (err) {
@@ -167,7 +168,7 @@ app.get('/api/veiculos/recentes', async (req, res) => {
     SELECT a.id, a.ano_modelo, a.preco, a.km, a.cidade, a.observacao, a.created_at,
       ma.nome AS marca, mo.nome AS modelo, t.nome AS tipo, t.slug AS tipo_slug,
       e.sigla AS estado_sigla,
-      img.id AS img_id, img.hash AS img_hash,
+      img.id AS img_id, img.imagem_file_name AS img_filename,
       CONCAT('https://www.trucadao.com.br/', t.slug, '/', ma.slug, '/', LOWER(e.sigla), '/', mo.slug, '/', a.id) AS url
     FROM anuncios a
     LEFT JOIN marcas ma ON ma.id = a.marca_id
@@ -183,7 +184,7 @@ app.get('/api/veiculos/recentes', async (req, res) => {
     conn = await pool.getConnection();
     const [rows] = await conn.query(sql, [Number(horas), Number(limit)]);
     const veiculos = rows.map(function(v) {
-      return Object.assign({}, v, { imagem: montarUrlImagem(v.img_id, v.img_hash) });
+      return Object.assign({}, v, { imagem: montarUrlImagem(v.img_id, v.img_filename) });
     });
     res.json({ total: veiculos.length, veiculos });
   } catch (err) {
@@ -199,7 +200,7 @@ app.get('/api/veiculos/:id', async (req, res) => {
     SELECT a.id, a.ano_modelo, a.preco, a.km, a.cidade, a.observacao, a.status, a.deleted,
       ma.nome AS marca, mo.nome AS modelo, t.nome AS tipo, t.slug AS tipo_slug,
       e.nome AS estado, e.sigla AS estado_sigla, ma.slug AS marca_slug, mo.slug AS modelo_slug,
-      img.id AS img_id, img.hash AS img_hash,
+      img.id AS img_id, img.imagem_file_name AS img_filename,
       CONCAT('https://www.trucadao.com.br/', t.slug, '/', ma.slug, '/', LOWER(e.sigla), '/', mo.slug, '/', a.id) AS url
     FROM anuncios a
     LEFT JOIN marcas ma ON ma.id = a.marca_id
@@ -216,7 +217,7 @@ app.get('/api/veiculos/:id', async (req, res) => {
       return res.status(404).json({ disponivel: false, motivo: 'nao_encontrado', mensagem: 'Anuncio nao encontrado no Patio Digital.' });
     }
     const v = rows[0];
-    const veiculo = Object.assign({}, v, { imagem: montarUrlImagem(v.img_id, v.img_hash) });
+    const veiculo = Object.assign({}, v, { imagem: montarUrlImagem(v.img_id, v.img_filename) });
     if (v.status === 2 || v.status === 3 || v.deleted === 1) {
       return res.json({
         disponivel: false,
