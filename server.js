@@ -143,7 +143,7 @@ app.get('/api/veiculos', async (req, res) => {
     LEFT JOIN modelos mo ON mo.id = a.modelo_id
     LEFT JOIN tipos t ON t.id = a.tipo_id
     LEFT JOIN estados e ON e.id = a.estado_id
-    LEFT JOIN imagens_anuncios img ON img.anuncio_id = a.id AND img.ordem = 1
+    LEFT JOIN imagens_anuncios img ON img.anuncio_id = a.id AND img.destaque = 1
     WHERE ${where.join(' AND ')}
     ORDER BY a.destaque DESC, a.created_at DESC LIMIT ?`;
   params.push(Number(limit));
@@ -175,7 +175,7 @@ app.get('/api/veiculos/recentes', async (req, res) => {
     LEFT JOIN modelos mo ON mo.id = a.modelo_id
     LEFT JOIN tipos t ON t.id = a.tipo_id
     LEFT JOIN estados e ON e.id = a.estado_id
-    LEFT JOIN imagens_anuncios img ON img.anuncio_id = a.id AND img.ordem = 1
+    LEFT JOIN imagens_anuncios img ON img.anuncio_id = a.id AND img.destaque = 1
     WHERE a.status = 1 AND a.deleted = 0
       AND a.created_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)
     ORDER BY a.created_at DESC LIMIT ?`;
@@ -207,7 +207,7 @@ app.get('/api/veiculos/:id', async (req, res) => {
     LEFT JOIN modelos mo ON mo.id = a.modelo_id
     LEFT JOIN tipos t ON t.id = a.tipo_id
     LEFT JOIN estados e ON e.id = a.estado_id
-    LEFT JOIN imagens_anuncios img ON img.anuncio_id = a.id AND img.ordem = 1
+    LEFT JOIN imagens_anuncios img ON img.anuncio_id = a.id AND img.destaque = 1
     WHERE a.id = ? LIMIT 1`;
   let conn;
   try {
