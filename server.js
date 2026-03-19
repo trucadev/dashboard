@@ -120,7 +120,37 @@ app.get('/api/stats', async (req, res) => {
     res.status(500).json({ error: 'Erro ao consultar banco', detail: err.message });
   } finally { if (conn) conn.release(); }
 });
- 
+ // ── FIPE ─────────────────────────────────────────────────────────────
+app.get('/api/fipe/marcas', async (req, res) => {
+  try {
+    const resp = await fetch('https://brasilapi.com.br/api/fipe/marcas/v1/caminhoes');
+    const data = await resp.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao consultar FIPE', detail: err.message });
+  }
+});
+
+app.get('/api/fipe/preco/:codigo', async (req, res) => {
+  try {
+    const resp = await fetch('https://brasilapi.com.br/api/fipe/preco/v1/' + req.params.codigo);
+    const data = await resp.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao consultar FIPE', detail: err.message });
+  }
+});
+
+app.get('/api/fipe/modelos/:marca', async (req, res) => {
+  try {
+    const resp = await fetch('https://brasilapi.com.br/api/fipe/veiculos/v1/caminhoes/' + req.params.marca);
+    const data = await resp.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao consultar FIPE', detail: err.message });
+  }
+});
+
 // ── VEICULOS POR FILTROS ──────────────────────────────────────────────
 app.get('/api/veiculos', async (req, res) => {
   const { marca, modelo, tipo, estado, preco_min, preco_max, subcategoria_id, limit = 10 } = req.query;
