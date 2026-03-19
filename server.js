@@ -3,12 +3,11 @@ const mysql   = require('mysql2/promise');
 const cors    = require('cors');
 const path    = require('path');
 require('dotenv').config();
- 
+
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
- 
+
 const pool = mysql.createPool({
   host:            process.env.DB_HOST || '159.89.243.28',
   port:            process.env.DB_PORT || 3306,
@@ -19,17 +18,17 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   timezone:        '-03:00',
 });
- 
+
 function montarUrlImagem(id, filename) {
   if (!id || !filename) return null;
-  const name = filename.replace(/\.jpg$/, "");
+  const name = filename.replace(/\.jpg$/, '');
   const padded = String(id).padStart(9, '0');
   const p1 = padded.slice(0, 3);
   const p2 = padded.slice(3, 6);
   const p3 = padded.slice(6, 9);
   return 'https://d2o450bmsmjkde.cloudfront.net/system/imagens_anuncios/imagems/' + p1 + '/' + p2 + '/' + p3 + '/normal/' + name + '.jpg';
 }
- 
+
 const SQL_REVENDAS = `
   SELECT COUNT(*) AS total_ativas,
     SUM(CASE WHEN pessoa = 'J' THEN 1 ELSE 0 END) AS recorrentes,
@@ -37,13 +36,13 @@ const SQL_REVENDAS = `
     COUNT(*) * 99.90 AS mrr_bruto,
     SUM(CASE WHEN pessoa = 'J' THEN 99.90 ELSE 0 END) AS mrr_recorrente
   FROM revendas WHERE status = 1`;
- 
+
 const SQL_ANUNCIOS = `
   SELECT SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS ativos,
     SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END) AS inativos,
     SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) AS vendidos,
     COUNT(*) AS total FROM anuncios`;
- 
+
 const SQL_REVENDAS_MES = `
   SELECT DATE_FORMAT(created_at, '%b/%y') AS mes, DATE_FORMAT(created_at, '%Y-%m') AS mes_ordem,
     COUNT(*) AS novas, SUM(CASE WHEN pessoa = 'J' THEN 1 ELSE 0 END) AS novas_j,
@@ -51,21 +50,21 @@ const SQL_REVENDAS_MES = `
   FROM revendas WHERE created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
   GROUP BY DATE_FORMAT(created_at, '%Y-%m'), DATE_FORMAT(created_at, '%b/%y')
   ORDER BY mes_ordem ASC LIMIT 12`;
- 
+
 const SQL_ANUNCIOS_MES = `
   SELECT DATE_FORMAT(created_at, '%b/%y') AS mes, DATE_FORMAT(created_at, '%Y-%m') AS mes_ordem,
     COUNT(*) AS publicados, SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) AS vendidos
   FROM anuncios WHERE created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
   GROUP BY DATE_FORMAT(created_at, '%Y-%m'), DATE_FORMAT(created_at, '%b/%y')
   ORDER BY mes_ordem ASC LIMIT 12`;
- 
+
 const SQL_CHURN_MES = `
   SELECT DATE_FORMAT(updated_at, '%b/%y') AS mes, DATE_FORMAT(updated_at, '%Y-%m') AS mes_ordem,
     COUNT(*) AS cancelamentos
   FROM revendas WHERE status = 2 AND updated_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
   GROUP BY DATE_FORMAT(updated_at, '%Y-%m'), DATE_FORMAT(updated_at, '%b/%y')
   ORDER BY mes_ordem ASC LIMIT 12`;
- 
+
 async function salvarLeadHubSpot(lead) {
   const token = process.env.HUBSPOT_TOKEN;
   if (!token) throw new Error('HUBSPOT_TOKEN nao configurado');
@@ -87,7 +86,7 @@ async function salvarLeadHubSpot(lead) {
   if (!res.ok) throw new Error(data.message || 'Erro HubSpot');
   return data;
 }
- 
+
 // ── STATS ─────────────────────────────────────────────────────────────
 app.get('/api/stats', async (req, res) => {
   let conn;
@@ -120,7 +119,8 @@ app.get('/api/stats', async (req, res) => {
     res.status(500).json({ error: 'Erro ao consultar banco', detail: err.message });
   } finally { if (conn) conn.release(); }
 });
- // ── FIPE ─────────────────────────────────────────────────────────────
+
+// ── FIPE ──────────────────────────────────────────────────────────────
 app.get('/api/fipe/marcas', async (req, res) => {
   try {
     const resp = await fetch('https://brasilapi.com.br/api/fipe/marcas/v1/caminhoes');
@@ -156,12 +156,12 @@ app.get('/api/veiculos', async (req, res) => {
   const { marca, modelo, tipo, estado, preco_min, preco_max, subcategoria_id, limit = 10 } = req.query;
   let where = ['a.status = 1', 'a.deleted = 0'];
   let params = [];
-  if (marca)           { where.push('ma.slug LIKE ?');      params.push('%' + marca + '%'); }
-  if (modelo)          { where.push('mo.slug LIKE ?');      params.push('%' + modelo + '%'); }
-  if (tipo)            { where.push('t.slug LIKE ?');       params.push('%' + tipo + '%'); }
-  if (estado)          { where.push('e.sigla LIKE ?');      params.push('%' + estado + '%'); }
-  if (preco_min)       { where.push('a.preco >= ?');        params.push(Number(preco_min)); }
-  if (preco_max)       { where.push('a.preco <= ?');        params.push(Number(preco_max)); }
+  if (marca)           { where.push('ma.slug LIKE ?');        params.push('%' + marca + '%'); }
+  if (modelo)          { where.push('mo.slug LIKE ?');        params.push('%' + modelo + '%'); }
+  if (tipo)            { where.push('t.slug LIKE ?');         params.push('%' + tipo + '%'); }
+  if (estado)          { where.push('e.sigla LIKE ?');        params.push('%' + estado + '%'); }
+  if (preco_min)       { where.push('a.preco >= ?');          params.push(Number(preco_min)); }
+  if (preco_max)       { where.push('a.preco <= ?');          params.push(Number(preco_max)); }
   if (subcategoria_id) { where.push('a.subcategoria_id = ?'); params.push(Number(subcategoria_id)); }
   const sql = `
     SELECT a.id, a.ano_modelo, a.preco, a.km, a.cidade, a.observacao, a.status,
@@ -191,7 +191,7 @@ app.get('/api/veiculos', async (req, res) => {
     res.status(500).json({ error: 'Erro ao buscar veiculos', detail: err.message });
   } finally { if (conn) conn.release(); }
 });
- 
+
 // ── VEICULOS RECENTES ─────────────────────────────────────────────────
 app.get('/api/veiculos/recentes', async (req, res) => {
   const { horas = 24, limit = 5 } = req.query;
@@ -223,7 +223,7 @@ app.get('/api/veiculos/recentes', async (req, res) => {
     res.status(500).json({ error: 'Erro ao buscar recentes', detail: err.message });
   } finally { if (conn) conn.release(); }
 });
- 
+
 // ── VEICULO POR ID ────────────────────────────────────────────────────
 app.get('/api/veiculos/:id', async (req, res) => {
   const { id } = req.params;
@@ -263,7 +263,7 @@ app.get('/api/veiculos/:id', async (req, res) => {
     res.status(500).json({ error: 'Erro ao buscar veiculo', detail: err.message });
   } finally { if (conn) conn.release(); }
 });
- 
+
 // ── STATS DE REVENDA ──────────────────────────────────────────────────
 app.get('/api/revendas/:id/stats', async (req, res) => {
   const { id } = req.params;
@@ -272,10 +272,20 @@ app.get('/api/revendas/:id/stats', async (req, res) => {
       COUNT(a.id) AS total_anuncios,
       SUM(CASE WHEN a.status = 1 THEN 1 ELSE 0 END) AS anuncios_ativos,
       SUM(CASE WHEN a.status = 3 THEN 1 ELSE 0 END) AS anuncios_vendidos,
-      COALESCE(SUM(a.acessos), 0) AS total_views,
-      COALESCE(SUM(a.raking), 0) AS total_whatsapp
+      COALESCE(SUM(ce_views.total_views), 0) AS total_views,
+      COALESCE(SUM(ce_wpp.total_wpp), 0) AS total_whatsapp
     FROM revendas r
     LEFT JOIN anuncios a ON a.revenda_id = r.id AND a.deleted = 0
+    LEFT JOIN (
+      SELECT anuncio_id, SUM(count) AS total_views
+      FROM contador_estatisticas WHERE tipo = 1
+      GROUP BY anuncio_id
+    ) ce_views ON ce_views.anuncio_id = a.id
+    LEFT JOIN (
+      SELECT anuncio_id, SUM(count) AS total_wpp
+      FROM contador_estatisticas WHERE tipo = 10
+      GROUP BY anuncio_id
+    ) ce_wpp ON ce_wpp.anuncio_id = a.id
     WHERE r.id = ?
     GROUP BY r.id, r.nome`;
   let conn;
@@ -289,7 +299,7 @@ app.get('/api/revendas/:id/stats', async (req, res) => {
     res.status(500).json({ error: 'Erro ao buscar stats da revenda', detail: err.message });
   } finally { if (conn) conn.release(); }
 });
- 
+
 // ── SALVAR LEAD ───────────────────────────────────────────────────────
 app.post('/api/leads', async (req, res) => {
   const { nome, telefone, cidade, veiculo_interesse, servico, urgencia, financiamento } = req.body;
@@ -302,16 +312,18 @@ app.post('/api/leads', async (req, res) => {
     res.status(500).json({ error: 'Erro ao salvar lead', detail: err.message });
   }
 });
- 
+
 // ── HEALTH ────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
- 
+
+// ── STATIC + FALLBACK ─────────────────────────────────────────────────
+app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
- 
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
   console.log('[Trucadao API] rodando na porta ' + PORT);
