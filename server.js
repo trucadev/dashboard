@@ -264,6 +264,31 @@ app.get('/api/veiculos/:id', async (req, res) => {
   } finally { if (conn) conn.release(); }
 });
 
+// ── BUSCAR REVENDA POR NOME ───────────────────────────────────────────
+app.get('/api/revendas/buscar', async (req, res) => {
+  const { nome } = req.query;
+  if (!nome) return res.status(400).json({ error: 'Parametro nome obrigatorio' });
+  const sql = `
+    SELECT r.id, r.nome, r.telefone, r.cidade, r.status,
+      COUNT(a.id) AS total_anuncios,
+      SUM(CASE WHEN a.status = 1 THEN 1 ELSE 0 END) AS ativos
+    FROM revendas r
+    LEFT JOIN anuncios a ON a.revenda_id = r.id AND a.deleted = 0
+    WHERE r.nome LIKE ? AND r.status = 1
+    GROUP BY r.id, r.nome, r.telefone, r.cidade, r.status
+    ORDER BY total_anuncios DESC
+    LIMIT 5`;
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const [rows] = await conn.query(sql, ['%' + nome + '%']);
+    res.json({ total: rows.length, revendas: rows });
+  } catch (err) {
+    console.error('[REVENDA BUSCAR ERROR]', err.message);
+    res.status(500).json({ error: 'Erro ao buscar revenda', detail: err.message });
+  } finally { if (conn) conn.release(); }
+});
+
 // ── STATS DE REVENDA ──────────────────────────────────────────────────
 app.get('/api/revendas/:id/stats', async (req, res) => {
   const { id } = req.params;
