@@ -292,33 +292,81 @@ app.get('/api/revendas/buscar', async (req, res) => {
 // ── STATS DE REVENDA ──────────────────────────────────────────────────
 app.get('/api/revendas/:id/stats', async (req, res) => {
   const { id } = req.params;
-  const sql = `
-    SELECT r.id, r.nome,
+
+  // Query principal — usa índices de mes e ano (rápido)
+  const sqlMain = `
+    SELECT r.id, r.nome, r.telefone,
       COUNT(a.id) AS total_anuncios,
       SUM(CASE WHEN a.status = 1 THEN 1 ELSE 0 END) AS anuncios_ativos,
       SUM(CASE WHEN a.status = 3 THEN 1 ELSE 0 END) AS anuncios_vendidos,
-      COALESCE(SUM(ce_views.total_views), 0) AS total_views,
-      COALESCE(SUM(ce_wpp.total_wpp), 0) AS total_whatsapp
+      COALESCE(SUM(ce_views.views_mes), 0) AS total_views,
+      COALESCE(SUM(ce_wpp.wpp_mes), 0) AS total_whatsapp
     FROM revendas r
     LEFT JOIN anuncios a ON a.revenda_id = r.id AND a.deleted = 0
     LEFT JOIN (
-      SELECT anuncio_id, SUM(count) AS total_views
-      FROM contador_estatisticas WHERE tipo = 1
+      SELECT anuncio_id, SUM(count) AS views_mes
+      FROM contador_estatisticas
+      WHERE tipo = 1 AND mes = MONTH(NOW()) AND ano = YEAR(NOW())
       GROUP BY anuncio_id
     ) ce_views ON ce_views.anuncio_id = a.id
     LEFT JOIN (
-      SELECT anuncio_id, SUM(count) AS total_wpp
-      FROM contador_estatisticas WHERE tipo = 10
+      SELECT anuncio_id, SUM(count) AS wpp_mes
+      FROM contador_estatisticas
+      WHERE tipo = 10 AND mes = MONTH(NOW()) AND ano = YEAR(NOW())
       GROUP BY anuncio_id
     ) ce_wpp ON ce_wpp.anuncio_id = a.id
     WHERE r.id = ?
-    GROUP BY r.id, r.nome`;
+    GROUP BY r.id, r.nome, r.telefone`;
+
+  // Query anúncios com stats do mês
+  const sqlAnuncios = `
+    SELECT a.id, ma.nome AS marca, mo.nome AS modelo, a.preco, a.ano_modelo,
+      t.slug AS tipo_slug, ma.slug AS marca_slug, e.sigla AS estado_sigla,
+      COALESCE(SUM(CASE WHEN ce.tipo = 1 THEN ce.count ELSE 0 END), 0) AS views_mes,
+      COALESCE(SUM(CASE WHEN ce.tipo = 10 THEN ce.count ELSE 0 END), 0) AS wpp_mes,
+      CONCAT('https://www.trucadao.com.br/', t.slug, '/', ma.slug, '/', LOWER(e.sigla), '/', mo.slug, '/', a.id) AS url
+    FROM anuncios a
+    LEFT JOIN marcas ma ON ma.id = a.marca_id
+    LEFT JOIN modelos mo ON mo.id = a.modelo_id
+    LEFT JOIN tipos t ON t.id = a.tipo_id
+    LEFT JOIN estados e ON e.id = a.estado_id
+    LEFT JOIN contador_estatisticas ce ON ce.anuncio_id = a.id
+      AND ce.mes = MONTH(NOW()) AND ce.ano = YEAR(NOW())
+    WHERE a.revenda_id = ? AND a.status = 1 AND a.deleted = 0
+    GROUP BY a.id, ma.nome, mo.nome, a.preco, a.ano_modelo, t.slug, ma.slug, e.sigla, mo.slug`;
+
   let conn;
   try {
     conn = await pool.getConnection();
-    const [rows] = await conn.query(sql, [id]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Revenda nao encontrada' });
-    res.json(rows[0]);
+    const [mainRows] = await conn.query(sqlMain, [id]);
+    if (mainRows.length === 0) return res.status(404).json({ error: 'Revenda nao encontrada' });
+    const r = mainRows[0];
+
+    const [todosAnuncios] = await conn.query(sqlAnuncios, [id]);
+
+    // Top = mais cliques no WhatsApp
+    const topAnuncio = [...todosAnuncios].sort((a, b) => b.wpp_mes - a.wpp_mes)[0] || null;
+
+    // Pior = mais views com menos cliques (oportunidade de ajuste)
+    const piorAnuncio = [...todosAnuncios]
+      .filter(a => a.views_mes > 3)
+      .sort((a, b) => b.views_mes - a.views_mes || a.wpp_mes - b.wpp_mes)[0] || null;
+
+    res.json({
+      id: r.id,
+      nome: r.nome,
+      telefone: r.telefone,
+      total_anuncios: Number(r.total_anuncios) || 0,
+      anuncios_ativos: Number(r.anuncios_ativos) || 0,
+      anuncios_vendidos: Number(r.anuncios_vendidos) || 0,
+      total_views: Number(r.total_views) || 0,
+      total_whatsapp: Number(r.total_whatsapp) || 0,
+      taxa_conversao: r.total_views > 0
+        ? ((r.total_whatsapp / r.total_views) * 100).toFixed(1)
+        : '0.0',
+      top_anuncio: topAnuncio,
+      pior_anuncio: piorAnuncio,
+    });
   } catch (err) {
     console.error('[REVENDA STATS ERROR]', err.message);
     res.status(500).json({ error: 'Erro ao buscar stats da revenda', detail: err.message });
@@ -351,101 +399,12 @@ app.get('/api/blog/recente', async (req, res) => {
     conn = await pool.getConnection();
     const [rows] = await conn.query(sql, [Number(limit)]);
     const posts = rows.map(function(p) {
-      return Object.assign({}, p, {
-        url: 'https://www.trucadao.com.br/blog/' + p.slug
-      });
+      return Object.assign({}, p, { url: 'https://www.trucadao.com.br/blog/' + p.slug });
     });
     res.json({ total: posts.length, posts });
   } catch (err) {
     console.error('[BLOG ERROR]', err.message);
     res.status(500).json({ error: 'Erro ao buscar blog', detail: err.message });
-  } finally { if (conn) conn.release(); }
-});
-
-// ── RELATORIO SEMANAL REVENDA ─────────────────────────────────────────
-app.get('/api/revendas/:id/relatorio', async (req, res) => {
-  const { id } = req.params;
-  const sql = `
-    SELECT
-      r.id, r.nome, r.telefone,
-      COUNT(a.id) AS total_anuncios,
-      SUM(CASE WHEN a.status = 1 THEN 1 ELSE 0 END) AS ativos,
-      SUM(CASE WHEN a.status = 3 THEN 1 ELSE 0 END) AS vendidos_semana,
-      COALESCE(SUM(ce_views.views_semana), 0) AS views_semana,
-      COALESCE(SUM(ce_wpp.wpp_semana), 0) AS whatsapp_semana
-    FROM revendas r
-    LEFT JOIN anuncios a ON a.revenda_id = r.id AND a.deleted = 0
-    LEFT JOIN (
-      SELECT anuncio_id, SUM(count) AS views_semana
-      FROM contador_estatisticas
-      WHERE tipo = 1
-        AND YEARWEEK(STR_TO_DATE(CONCAT(ano, '-', mes, '-01'), '%Y-%m-%d'), 1) = YEARWEEK(NOW(), 1)
-      GROUP BY anuncio_id
-    ) ce_views ON ce_views.anuncio_id = a.id
-    LEFT JOIN (
-      SELECT anuncio_id, SUM(count) AS wpp_semana
-      FROM contador_estatisticas
-      WHERE tipo = 10
-        AND YEARWEEK(STR_TO_DATE(CONCAT(ano, '-', mes, '-01'), '%Y-%m-%d'), 1) = YEARWEEK(NOW(), 1)
-      GROUP BY anuncio_id
-    ) ce_wpp ON ce_wpp.anuncio_id = a.id
-    WHERE r.id = ?
-    GROUP BY r.id, r.nome, r.telefone`;
-
-  const sqlTopAnuncios = `
-    SELECT
-      a.id, mo.nome AS modelo, ma.nome AS marca, a.preco, a.ano_modelo,
-      COALESCE(SUM(ce.count), 0) AS views_semana,
-      CONCAT('https://www.trucadao.com.br/', t.slug, '/', ma.slug, '/', LOWER(e.sigla), '/', mo.slug, '/', a.id) AS url
-    FROM anuncios a
-    LEFT JOIN marcas ma ON ma.id = a.marca_id
-    LEFT JOIN modelos mo ON mo.id = a.modelo_id
-    LEFT JOIN tipos t ON t.id = a.tipo_id
-    LEFT JOIN estados e ON e.id = a.estado_id
-    LEFT JOIN contador_estatisticas ce ON ce.anuncio_id = a.id AND ce.tipo = 1
-      AND YEARWEEK(STR_TO_DATE(CONCAT(ce.ano, '-', ce.mes, '-01'), '%Y-%m-%d'), 1) = YEARWEEK(NOW(), 1)
-    WHERE a.revenda_id = ? AND a.status = 1 AND a.deleted = 0
-    GROUP BY a.id, mo.nome, ma.nome, a.preco, a.ano_modelo, t.slug, ma.slug, e.sigla, mo.slug
-    ORDER BY views_semana DESC
-    LIMIT 3`;
-
-  const sqlSemViews = `
-    SELECT COUNT(*) AS sem_views
-    FROM anuncios a
-    LEFT JOIN contador_estatisticas ce ON ce.anuncio_id = a.id AND ce.tipo = 1
-      AND ce.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-    WHERE a.revenda_id = ? AND a.status = 1 AND a.deleted = 0
-    GROUP BY a.id
-    HAVING SUM(COALESCE(ce.count, 0)) = 0`;
-
-  let conn;
-  try {
-    conn = await pool.getConnection();
-    const [[revenda]] = await conn.query(sql, [id]);
-    if (!revenda) return res.status(404).json({ error: 'Revenda nao encontrada' });
-    const [topAnuncios] = await conn.query(sqlTopAnuncios, [id]);
-    const [semViews] = await conn.query(sqlSemViews, [id]);
-    res.json({
-      revenda: {
-        id: revenda.id,
-        nome: revenda.nome,
-        telefone: revenda.telefone,
-      },
-      semana: {
-        views: Number(revenda.views_semana) || 0,
-        whatsapp: Number(revenda.whatsapp_semana) || 0,
-        vendidos: Number(revenda.vendidos_semana) || 0,
-        total_anuncios: Number(revenda.total_anuncios) || 0,
-        taxa_conversao: revenda.views_semana > 0
-          ? ((revenda.whatsapp_semana / revenda.views_semana) * 100).toFixed(1)
-          : '0.0',
-        anuncios_sem_views: semViews.length,
-      },
-      top_anuncios: topAnuncios,
-    });
-  } catch (err) {
-    console.error('[RELATORIO ERROR]', err.message);
-    res.status(500).json({ error: 'Erro ao gerar relatorio', detail: err.message });
   } finally { if (conn) conn.release(); }
 });
 
